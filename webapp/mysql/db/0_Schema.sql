@@ -32,6 +32,7 @@ CREATE TABLE isuumo.estate
                               ELSE 3 END)) STORED NOT NULL
 );
 CREATE INDEX rent_id_idx on isuumo.estate (rent, id);
+CREATE INDEX rent_id_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
 
 
 CREATE TABLE isuumo.chair
