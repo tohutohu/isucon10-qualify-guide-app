@@ -29,13 +29,14 @@ CREATE TABLE isuumo.estate
     rent_id INTEGER AS ((CASE WHEN (rent < 50000) THEN 0
                               WHEN (rent < 100000) THEN 1
                               WHEN (rent < 150000) THEN 2
-                              ELSE 3 END)) STORED NOT NULL
+                              ELSE 3 END)) STORED NOT NULL,
+    lat_log POINT AS ((POINT(latitude, longitude))) STORED NOT NULL
+    
 );
 CREATE INDEX rent_id_idx on isuumo.estate (rent, id);
 CREATE INDEX rent_id_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
 CREATE INDEX door_height_id_pupularity_id_idx ON isuumo.estate (door_height_id, popularity DESC, id);
 CREATE INDEX door_width_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
-
 
 CREATE TABLE isuumo.chair
 (
