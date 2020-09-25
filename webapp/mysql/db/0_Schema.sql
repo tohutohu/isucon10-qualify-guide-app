@@ -69,6 +69,7 @@ CREATE TABLE isuumo.chair
                                WHEN (price < 15000) THEN 4
                                ELSE 5 END)) STORED NOT NULL
 );
+CREATE INDEX price_id_idx on isuumo.chair (price, id);
 CREATE INDEX stock_price_id_idx on isuumo.chair (stock, price, id);
 
 SET GLOBAL slow_query_log='ON';
