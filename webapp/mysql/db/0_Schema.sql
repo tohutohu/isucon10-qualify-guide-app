@@ -219,6 +219,9 @@ CREATE INDEX idx14 on isuumo.chair(price_id, width_id, color, stock, popularity 
 CREATE INDEX idx15 on isuumo.chair(price_id, kind, color, stock, popularity desc, id);
 CREATE INDEX idx16 on isuumo.chair(height_id, width_id, depth_id, color, stock, popularity desc, id);
 CREATE INDEX idx17 on isuumo.chair(price_id, width_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx18 on isuumo.chair(height_id, width_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx19 on isuumo.chair(height_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx20 on isuumo.chair(price_id, color, stock, popularity desc, id);
 
 SET GLOBAL slow_query_log='ON';
 SET GLOBAL long_query_time=0;
