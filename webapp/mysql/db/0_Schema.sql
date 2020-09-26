@@ -86,11 +86,11 @@ CREATE TABLE isuumo.estate
 );
 CREATE INDEX rentid_idx on isuumo.estate (rent_id);
 CREATE INDEX rent_id_idx on isuumo.estate (rent, id);
-# CREATE INDEX rentid_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
-# CREATE INDEX doorheightid_pupularity_id_idx ON isuumo.estate (door_height_id, popularity DESC, id);
-# CREATE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
-# CREATE INDEX doorwidthid_rentid_idx ON isuumo.estate (door_width_id, rent_id);
-# CREATE INDEX doorheightid_rentid_idx ON isuumo.estate (door_height_id, rent_id);
+CREATE INDEX rentid_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
+CREATE INDEX doorheightid_pupularity_id_idx ON isuumo.estate (door_height_id, popularity DESC, id);
+CREATE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
+CREATE INDEX doorwidthid_rentid_idx ON isuumo.estate (door_width_id, rent_id);
+CREATE INDEX doorheightid_rentid_idx ON isuumo.estate (door_height_id, rent_id);
 CREATE INDEX lat_log_idx ON isuumo.estate (lat_log);
 CREATE INDEX popularity_id_idx ON isuumo.estate (popularity desc, id);
 
