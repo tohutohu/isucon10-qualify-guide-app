@@ -202,6 +202,12 @@ CREATE INDEX price_id_idx on isuumo.chair (price, id);
 CREATE INDEX stock_price_id_idx on isuumo.chair (stock, price, id);
 CREATE INDEX popularity_id_idx on isuumo.chair (popularity desc, id);
 
+CREATE INDEX idx1 on isuumo.chair(price_id, height_id, depth_id, kind, stock, popularity desc, id);
+CREATE INDEX idx2 on isuumo.chair(price_id, height_id, width_id, color, stock, popularity desc, id);
+CREATE INDEX idx3 on isuumo.chair(price_id, height_id, width_id, depth_id, stock, popularity desc, id);
+CREATE INDEX idx4 on isuumo.chair(price_id, height_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx5 on isuumo.chair(price_id, height_id, width_id, kind, stock, popularity desc, id);
+
 SET GLOBAL slow_query_log='ON';
 SET GLOBAL long_query_time=0;
 SET GLOBAL slow_query_log_file='/var/log/mysql/slow.log';
