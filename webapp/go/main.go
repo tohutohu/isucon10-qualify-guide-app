@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -250,6 +251,20 @@ func init() {
 		os.Exit(1)
 	}
 	json.Unmarshal(jsonText, &estateSearchCondition)
+
+	reset()
+}
+
+var recommendCache map[int]EstateListResponse
+var recommendCacheMux sync.RWMutex
+
+func reset() {
+	resetChair()
+}
+
+func resetChair() {
+	recommendCache = make(map[int]EstateListResponse)
+	recommendCacheMux = sync.RWMutex{}
 }
 
 func main() {
@@ -299,14 +314,14 @@ func main() {
 	if err != nil {
 		e.Logger.Fatalf("DB connection failed : %v", err)
 	}
-	estateDb.SetMaxOpenConns(50)
+	estateDb.SetMaxOpenConns(100)
 	defer estateDb.Close()
 
 	chairDb, err = chairMySQLConnectionData.ConnectDB()
 	if err != nil {
 		e.Logger.Fatalf("DB connection failed : %v", err)
 	}
-	chairDb.SetMaxOpenConns(10)
+	chairDb.SetMaxOpenConns(100)
 	defer chairDb.Close()
 
 	// Start server
@@ -315,6 +330,7 @@ func main() {
 }
 
 func initialize(c echo.Context) error {
+	reset()
 	sqlDir := filepath.Join("..", "mysql", "db")
 	estatePaths := []string{
 		filepath.Join(sqlDir, "0_Schema.sql"),
@@ -442,6 +458,7 @@ func postChair(c echo.Context) error {
 		c.Logger().Errorf("failed to insert chair: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	resetChair()
 	return c.NoContent(http.StatusCreated)
 }
 
@@ -607,19 +624,6 @@ func getEstateDetail(c echo.Context) error {
 	return c.JSON(http.StatusOK, estate)
 }
 
-func getRange(cond RangeCondition, rangeID string) (*Range, error) {
-	RangeIndex, err := strconv.Atoi(rangeID)
-	if err != nil {
-		return nil, err
-	}
-
-	if RangeIndex < 0 || len(cond.Ranges) <= RangeIndex {
-		return nil, fmt.Errorf("Unexpected Range ID")
-	}
-
-	return cond.Ranges[RangeIndex], nil
-}
-
 func postEstate(c echo.Context) error {
 	header, err := c.FormFile("estates")
 	if err != nil {
@@ -769,6 +773,12 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 		c.Logger().Infof("Invalid format searchRecommendedEstateWithChair id : %v", err)
 		return c.NoContent(http.StatusBadRequest)
 	}
+	recommendCacheMux.RLock()
+	if res, ok := recommendCache[id]; ok {
+		recommendCacheMux.RUnlock()
+		return c.JSON(http.StatusOK, res)
+	}
+	recommendCacheMux.RUnlock()
 
 	chair := Chair{}
 	query := `SELECT height, width, depth FROM chair WHERE id = ?`
@@ -796,13 +806,20 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	err = estateDb.Select(&estates, query, w, h, h, w, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			recommendCacheMux.Lock()
+			recommendCache[id] = EstateListResponse{[]Estate{}}
+			recommendCacheMux.Unlock()
+
 			return c.JSON(http.StatusOK, EstateListResponse{[]Estate{}})
 		}
 		c.Logger().Errorf("Database execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, EstateListResponse{Estates: estates})
+	recommendCacheMux.Lock()
+	defer recommendCacheMux.Unlock()
+	recommendCache[id] = EstateListResponse{Estates: estates}
+	return c.JSON(http.StatusOK, recommendCache[id])
 }
 
 func searchEstateNazotte(c echo.Context) error {
