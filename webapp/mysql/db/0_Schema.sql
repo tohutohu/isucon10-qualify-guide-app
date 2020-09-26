@@ -41,6 +41,7 @@ CREATE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popu
 CREATE INDEX doorwidthid_rentid_idx ON isuumo.estate (door_width_id, rent_id);
 CREATE INDEX doorheightid_rentid_idx ON isuumo.estate (door_height_id, rent_id);
 CREATE INDEX lat_log_idx ON isuumo.estate (lat_log);
+CREATE INDEX popularity_id_idx ON isuumo.estate (popularity desc, id);
 
 CREATE TABLE isuumo.chair
 (
