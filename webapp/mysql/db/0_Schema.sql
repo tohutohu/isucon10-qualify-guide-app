@@ -84,15 +84,25 @@ CREATE TABLE isuumo.estate
       "デザイナーズ物件"
     ) AS (features) STORED NOT NULL
 );
-CREATE INDEX rentid_idx on isuumo.estate (rent_id);
-CREATE INDEX rent_id_idx on isuumo.estate (rent, id);
-# CREATE INDEX rentid_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
-# CREATE INDEX doorheightid_pupularity_id_idx ON isuumo.estate (door_height_id, popularity DESC, id);
-# CREATE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
-# CREATE INDEX doorwidthid_rentid_idx ON isuumo.estate (door_width_id, rent_id);
-# CREATE INDEX doorheightid_rentid_idx ON isuumo.estate (door_height_id, rent_id);
 CREATE INDEX lat_log_idx ON isuumo.estate (lat_log);
-CREATE INDEX popularity_id_idx ON isuumo.estate (popularity desc, id);
+
+# height width rent feature
+CREATE INDEX idx1  ON isuumo.estate (door_height_id, door_width_id, rent_id, features_set, popularity desc, id);
+CREATE INDEX idx2  ON isuumo.estate (                door_width_id, rent_id, features_set, popularity desc, id);
+CREATE INDEX idx3  ON isuumo.estate (door_height_id,                rent_id, features_set, popularity desc, id);
+CREATE INDEX idx4  ON isuumo.estate (                               rent_id, features_set, popularity desc, id);
+CREATE INDEX idx5  ON isuumo.estate (door_height_id, door_width_id,          features_set, popularity desc, id);
+CREATE INDEX idx6  ON isuumo.estate (                door_width_id,          features_set, popularity desc, id);
+CREATE INDEX idx7  ON isuumo.estate (door_height_id,                         features_set, popularity desc, id);
+CREATE INDEX idx8  ON isuumo.estate (                                        features_set, popularity desc, id);
+CREATE INDEX idx9  ON isuumo.estate (door_height_id, door_width_id, rent_id,               popularity desc, id);
+CREATE INDEX idx10 ON isuumo.estate (                door_width_id, rent_id,               popularity desc, id);
+CREATE INDEX idx11 ON isuumo.estate (door_height_id,                rent_id,               popularity desc, id);
+CREATE INDEX idx12 ON isuumo.estate (                               rent_id,               popularity desc, id);
+CREATE INDEX idx13 ON isuumo.estate (door_height_id, door_width_id,                        popularity desc, id);
+CREATE INDEX idx14 ON isuumo.estate (                door_width_id,                        popularity desc, id);
+CREATE INDEX idx15 ON isuumo.estate (door_height_id,                                       popularity desc, id);
+CREATE INDEX idx16 ON isuumo.estate (                                                      popularity desc, id);
 
 CREATE TABLE isuumo.chair
 (
