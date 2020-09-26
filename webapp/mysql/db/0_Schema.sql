@@ -207,6 +207,18 @@ CREATE INDEX idx2 on isuumo.chair(price_id, height_id, width_id, color, stock, p
 CREATE INDEX idx3 on isuumo.chair(price_id, height_id, width_id, depth_id, stock, popularity desc, id);
 CREATE INDEX idx4 on isuumo.chair(price_id, height_id, kind, color, stock, popularity desc, id);
 CREATE INDEX idx5 on isuumo.chair(price_id, height_id, width_id, kind, stock, popularity desc, id);
+CREATE INDEX idx6 on isuumo.chair(price_id, width_id, depth_id, color, stock, popularity desc, id);
+CREATE INDEX idx7 on isuumo.chair(price_id, width_id, depth_id, kind, stock, popularity desc, id);
+CREATE INDEX idx8 on isuumo.chair(price_id, width_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx9 on isuumo.chair(price_id, height_id, color, stock, popularity desc, id);
+CREATE INDEX idx10 on isuumo.chair(price_id, width_id, color, stock, popularity desc, id);
+CREATE INDEX idx11 on isuumo.chair(price_id, depth_id, color, stock, popularity desc, id);
+CREATE INDEX idx12 on isuumo.chair(height_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx13 on isuumo.chair(price_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx14 on isuumo.chair(price_id, width_id, color, stock, popularity desc, id);
+CREATE INDEX idx15 on isuumo.chair(price_id, kind, color, stock, popularity desc, id);
+CREATE INDEX idx16 on isuumo.chair(height_id, width_id, depth_id, color, stock, popularity desc, id);
+CREATE INDEX idx17 on isuumo.chair(price_id, width_id, depth_id, kind, color, stock, popularity desc, id);
 
 SET GLOBAL slow_query_log='ON';
 SET GLOBAL long_query_time=0;
