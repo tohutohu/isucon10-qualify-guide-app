@@ -516,7 +516,7 @@ func searchChairs(c echo.Context) error {
 
 	if c.QueryParam("features") != "" {
 		for _, f := range strings.Split(c.QueryParam("features"), ",") {
-			conditions = append(conditions, "features LIKE CONCAT('%', ?, '%')")
+			conditions = append(conditions, "FIND_IN_SET(?, features_set)>0")
 			params = append(params, f)
 		}
 	}
@@ -719,7 +719,7 @@ func searchEstates(c echo.Context) error {
 
 	if c.QueryParam("features") != "" {
 		for _, f := range strings.Split(c.QueryParam("features"), ",") {
-			conditions = append(conditions, "features like concat('%', ?, '%')")
+			conditions = append(conditions, "FIND_IN_SET(?, features_set)>0")
 			params = append(params, f)
 		}
 	}
