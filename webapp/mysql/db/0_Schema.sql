@@ -85,14 +85,14 @@ CREATE TABLE isuumo.estate
     ) AS (features) STORED NOT NULL
 );
 CREATE INDEX rentid_idx on isuumo.estate (rent_id);
-CREATE INDEX rent_id_idx on isuumo.estate (rent, id);
-CREATE INDEX rentid_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
-CREATE INDEX doorheightid_pupularity_id_idx ON isuumo.estate (door_height_id, popularity DESC, id);
-CREATE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
+CREATE UNIQUE INDEX rent_id_idx on isuumo.estate (rent, id);
+CREATE UNIQUE INDEX rentid_pupularity_id_idx ON isuumo.estate (rent_id, popularity DESC, id);
+CREATE UNIQUE INDEX doorheightid_pupularity_id_idx ON isuumo.estate (door_height_id, popularity DESC, id);
+CREATE UNIQUE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
 CREATE INDEX doorwidthid_rentid_idx ON isuumo.estate (door_width_id, rent_id);
 CREATE INDEX doorheightid_rentid_idx ON isuumo.estate (door_height_id, rent_id);
 CREATE INDEX lat_log_idx ON isuumo.estate (lat_log);
-CREATE INDEX popularity_id_idx ON isuumo.estate (popularity desc, id);
+CREATE UNIQUE INDEX popularity_id_idx ON isuumo.estate (popularity desc, id);
 
 CREATE TABLE isuumo.chair
 (
@@ -198,30 +198,29 @@ CREATE TABLE isuumo.chair
       "フットレスト付き"
     ) AS (features) STORED NOT NULL
 );
-CREATE INDEX price_id_idx on isuumo.chair (price, id);
-CREATE INDEX stock_price_id_idx on isuumo.chair (stock, price, id);
-CREATE INDEX popularity_id_idx on isuumo.chair (popularity desc, id);
-
-CREATE INDEX idx1 on isuumo.chair(price_id, height_id, depth_id, kind, stock, popularity desc, id);
-CREATE INDEX idx2 on isuumo.chair(price_id, height_id, width_id, color, stock, popularity desc, id);
-CREATE INDEX idx3 on isuumo.chair(price_id, height_id, width_id, depth_id, stock, popularity desc, id);
-CREATE INDEX idx4 on isuumo.chair(price_id, height_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx5 on isuumo.chair(price_id, height_id, width_id, kind, stock, popularity desc, id);
-CREATE INDEX idx6 on isuumo.chair(price_id, width_id, depth_id, color, stock, popularity desc, id);
-CREATE INDEX idx7 on isuumo.chair(price_id, width_id, depth_id, kind, stock, popularity desc, id);
-CREATE INDEX idx8 on isuumo.chair(price_id, width_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx9 on isuumo.chair(price_id, height_id, color, stock, popularity desc, id);
-CREATE INDEX idx10 on isuumo.chair(price_id, width_id, color, stock, popularity desc, id);
-CREATE INDEX idx11 on isuumo.chair(price_id, depth_id, color, stock, popularity desc, id);
-CREATE INDEX idx12 on isuumo.chair(height_id, depth_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx13 on isuumo.chair(price_id, depth_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx14 on isuumo.chair(price_id, width_id, color, stock, popularity desc, id);
-CREATE INDEX idx15 on isuumo.chair(price_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx16 on isuumo.chair(height_id, width_id, depth_id, color, stock, popularity desc, id);
-CREATE INDEX idx17 on isuumo.chair(price_id, width_id, depth_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx18 on isuumo.chair(height_id, width_id, depth_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx19 on isuumo.chair(height_id, kind, color, stock, popularity desc, id);
-CREATE INDEX idx20 on isuumo.chair(price_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX price_id_idx on isuumo.chair (price, id);
+CREATE UNIQUE INDEX stock_price_id_idx on isuumo.chair (stock, price, id);
+CREATE UNIQUE INDEX popularity_id_idx on isuumo.chair (popularity desc, id);
+CREATE UNIQUE INDEX idx1 on isuumo.chair(price_id, height_id, depth_id, kind, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx2 on isuumo.chair(price_id, height_id, width_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx3 on isuumo.chair(price_id, height_id, width_id, depth_id, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx4 on isuumo.chair(price_id, height_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx5 on isuumo.chair(price_id, height_id, width_id, kind, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx6 on isuumo.chair(price_id, width_id, depth_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx7 on isuumo.chair(price_id, width_id, depth_id, kind, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx8 on isuumo.chair(price_id, width_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx9 on isuumo.chair(price_id, height_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx10 on isuumo.chair(price_id, width_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx11 on isuumo.chair(price_id, depth_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx12 on isuumo.chair(height_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx13 on isuumo.chair(price_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx14 on isuumo.chair(price_id, width_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx15 on isuumo.chair(price_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx16 on isuumo.chair(height_id, width_id, depth_id, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx17 on isuumo.chair(price_id, width_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx18 on isuumo.chair(height_id, width_id, depth_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx19 on isuumo.chair(height_id, kind, color, stock, popularity desc, id);
+CREATE UNIQUE INDEX idx20 on isuumo.chair(price_id, color, stock, popularity desc, id);
 
 SET GLOBAL slow_query_log='ON';
 SET GLOBAL long_query_time=0;
