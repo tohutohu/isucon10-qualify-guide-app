@@ -79,6 +79,7 @@ CREATE TABLE isuumo.chair
 );
 CREATE INDEX price_id_idx on isuumo.chair (price, id);
 CREATE INDEX stock_price_id_idx on isuumo.chair (stock, price, id);
+CREATE INDEX popularity_id_idx on isuumo.chair (popularity desc, id);
 
 SET GLOBAL slow_query_log='ON';
 SET GLOBAL long_query_time=0;
