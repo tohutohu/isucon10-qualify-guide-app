@@ -91,6 +91,8 @@ CREATE UNIQUE INDEX doorheightid_pupularity_id_idx ON isuumo.estate (door_height
 CREATE UNIQUE INDEX doorwidthid_pupularity_id_idx ON isuumo.estate (door_width_id, popularity DESC, id);
 CREATE INDEX doorwidthid_rentid_idx ON isuumo.estate (door_width_id, rent_id);
 CREATE INDEX doorheightid_rentid_idx ON isuumo.estate (door_height_id, rent_id);
+CREATE INDEX latitude ON isuumo.estate (latitude);
+CREATE INDEX longitude ON isuumo.estate (longitude);
 CREATE INDEX lat_log_idx ON isuumo.estate (lat_log);
 CREATE UNIQUE INDEX popularity_id_idx ON isuumo.estate (popularity desc, id);
 
