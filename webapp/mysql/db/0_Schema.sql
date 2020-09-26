@@ -53,9 +53,27 @@ CREATE TABLE isuumo.chair
     height      INTEGER         NOT NULL,
     width       INTEGER         NOT NULL,
     depth       INTEGER         NOT NULL,
-    color       VARCHAR(64)     NOT NULL,
+    color       ENUM(
+      "黒",
+      "白",
+      "赤",
+      "青",
+      "緑",
+      "黄",
+      "紫",
+      "ピンク",
+      "オレンジ",
+      "水色",
+      "ネイビー",
+      "ベージュ"
+    )     NOT NULL,
     features    VARCHAR(64)     NOT NULL,
-    kind        VARCHAR(64)     NOT NULL,
+    kind        ENUM(
+      "ゲーミングチェア",
+      "座椅子",
+      "エルゴノミクス",
+      "ハンモック"
+    )     NOT NULL,
     popularity  INTEGER         NOT NULL,
     stock       INTEGER         NOT NULL,
     height_id INTEGER AS ((CASE WHEN (height < 80) THEN 0
