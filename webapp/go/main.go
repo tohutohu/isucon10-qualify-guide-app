@@ -260,6 +260,13 @@ func init() {
 func reset() {
 	resetChair()
 	resetGetEstateCache()
+	resetLowPricedChairs()
+}
+
+var lowPricedChairs sync.Map
+
+func resetLowPricedChairs() {
+	lowPricedChairs = sync.Map{}
 }
 
 var recommendCache map[int]EstateListResponse
@@ -627,6 +634,9 @@ func getChairSearchCondition(c echo.Context) error {
 
 func getLowPricedChair(c echo.Context) error {
 	var chairs []Chair
+	if val, ok := lowPricedChairs.Load("cache"); ok {
+		return JSON(c, http.StatusOK, ChairListResponse{Chairs: val.([]Chair)})
+	}
 	query := `SELECT id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT ?`
 	err := chairDb.Select(&chairs, query, Limit)
 	if err != nil {
@@ -638,6 +648,7 @@ func getLowPricedChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	lowPricedChairs.Store("cache", chairs)
 	return JSON(c, http.StatusOK, ChairListResponse{Chairs: chairs})
 }
 
@@ -715,6 +726,7 @@ func postEstate(c echo.Context) error {
 		c.Logger().Errorf("failed to insert estate: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	lowPricedChairs.Delete("cache")
 	return c.NoContent(http.StatusCreated)
 }
 
