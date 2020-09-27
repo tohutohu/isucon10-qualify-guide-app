@@ -257,10 +257,13 @@ func init() {
 	reset()
 }
 
+var estateMap sync.Map
+
 func reset() {
 	resetChair()
 	resetGetEstateCache()
 	resetLowPriced()
+	estateMap = sync.Map{}
 }
 
 var lowPriced sync.Map
@@ -660,12 +663,9 @@ func getEstateDetail(c echo.Context) error {
 		c.Echo().Logger.Infof("Request parameter \"id\" parse error : %v", err)
 		return c.NoContent(http.StatusBadRequest)
 	}
-	getEstateCacheMux.RLock()
-	if val, ok := getEstateCache[id]; ok {
-		getEstateCacheMux.RUnlock()
+	if val, ok := estateMap.Load(c.Param("id")); ok {
 		return JSON(c, http.StatusOK, val)
 	}
-	getEstateCacheMux.RUnlock()
 
 	var estate Estate
 	err = estateDb.Get(&estate, "SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate WHERE id = ?", id)
@@ -678,9 +678,7 @@ func getEstateDetail(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	getEstateCacheMux.Lock()
-	defer getEstateCacheMux.Unlock()
-	getEstateCache[id] = estate
+	estateMap.Store(c.Param("id"), estate)
 	return JSON(c, http.StatusOK, estate)
 }
 
@@ -942,6 +940,9 @@ func postEstateRequestDocument(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
+	if val, ok := estateMap.Load(c.Param("id")); ok {
+		return JSON(c, http.StatusOK, val)
+	}
 	estate := Estate{}
 	query := `SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate WHERE id = ?`
 	err = estateDb.Get(&estate, query, id)
@@ -953,6 +954,7 @@ func postEstateRequestDocument(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	estateMap.Store(c.Param("id"), estate)
 	return c.NoContent(http.StatusOK)
 }
 
