@@ -367,14 +367,6 @@ func main() {
 	}
 	estateDb.SetMaxOpenConns(100)
 	defer estateDb.Close()
-	nazotteStmt, err = estateDb.Preparex(nazotteQuery)
-	if err != nil {
-		e.Logger.Fatalf("DB prepare failed : %v", err)
-	}
-	recommendStmt, err = estateDb.Preparex(recommendQuery)
-	if err != nil {
-		e.Logger.Fatalf("DB prepare failed : %v", err)
-	}
 
 	chairDb, err = chairMySQLConnectionData.ConnectDB()
 	if err != nil {
@@ -926,9 +918,6 @@ func getLowPricedEstate(c echo.Context) error {
 	return JSON(c, http.StatusOK, EstateListResponse{Estates: estates})
 }
 
-var recommendQuery = `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
-var recommendStmt *sqlx.Stmt
-
 func searchRecommendedEstateWithChair(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -949,11 +938,13 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	if h > d {
 		h, d = d, h
 	}
-	err = recommendStmt.Select(&estateIDs, w, h, h, w, Limit)
+	query := `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
+	err = estateDb.Select(&estateIDs, query, w, h, h, w, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateListResponse{[]Estate{}})
 		}
+		c.Logger().Errorf("Database execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	estates := estatesPool.Get().([]Estate)
@@ -979,9 +970,6 @@ var estateSearchResponsePool = sync.Pool{
 	},
 }
 
-var nazotteQuery = `SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(?), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`
-var nazotteStmt *sqlx.Stmt
-
 func searchEstateNazotte(c echo.Context) error {
 	coordinates := coordinatePool.Get().(Coordinates)
 	err := c.Bind(&coordinates)
@@ -996,7 +984,8 @@ func searchEstateNazotte(c echo.Context) error {
 	b := coordinates.getBoundingBox()
 	estateIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(estateIDs)
-	err = nazotteStmt.Select(&estateIDs, coordinates.coordinatesToText(), b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, NazotteLimit)
+	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(%s), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`, coordinates.coordinatesToText())
+	err = estateDb.Select(&estateIDs, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, NazotteLimit)
 	if err == sql.ErrNoRows {
 		return JSON(c, http.StatusOK, emptyEstateSearchResponse)
 	} else if err != nil {
@@ -1088,5 +1077,5 @@ func (cs Coordinates) coordinatesToText() string {
 	for _, c := range cs.Coordinates {
 		points = append(points, fmt.Sprintf("%f %f", c.Latitude, c.Longitude))
 	}
-	return fmt.Sprintf("POLYGON((%s))", strings.Join(points, ","))
+	return fmt.Sprintf("'POLYGON((%s))'", strings.Join(points, ","))
 }
