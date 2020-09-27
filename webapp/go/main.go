@@ -374,14 +374,6 @@ func main() {
 	}
 	chairDb.SetMaxOpenConns(100)
 	defer chairDb.Close()
-	lowPricedChairStmt, err = chairDb.Preparex(lowPricedChairQuery)
-	if err != nil {
-		e.Logger.Fatalf("DB prepare failed : %v", err)
-	}
-	buyChairStmt, err = chairDb.Preparex(buyChairQuery)
-	if err != nil {
-		e.Logger.Fatalf("DB prepare failed : %v", err)
-	}
 
 	// ここからソケット接続設定 ---
 	socket_file := "/var/run/app.sock"
@@ -666,9 +658,6 @@ func searchChairs(c echo.Context) error {
 	return JSON(c, http.StatusOK, res)
 }
 
-var buyChairQuery = "UPDATE chair SET stock = stock - 1 WHERE id = ?"
-var buyChairStmt *sqlx.Stmt
-
 func buyChair(c echo.Context) error {
 	m := echo.Map{}
 	if err := c.Bind(&m); err != nil {
@@ -693,7 +682,7 @@ func buyChair(c echo.Context) error {
 	chair.Stock--
 	chairMap.Store(int64(id), chair)
 
-	_, err = buyChairStmt.Exec(id)
+	_, err = chairDb.Exec("UPDATE chair SET stock = stock - 1 WHERE id = ?", id)
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -706,16 +695,14 @@ func getChairSearchCondition(c echo.Context) error {
 	return JSON(c, http.StatusOK, chairSearchCondition)
 }
 
-var lowPricedChairQuery = `SELECT id FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT 20`
-var lowPricedChairStmt *sqlx.Stmt
-
 func getLowPricedChair(c echo.Context) error {
 	if val, ok := lowPriced.Load("chair"); ok {
 		return JSON(c, http.StatusOK, ChairListResponse{Chairs: val.([]Chair)})
 	}
 	chairIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(chairIDs)
-	err := lowPricedChairStmt.Select(&chairIDs)
+	query := `SELECT id FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT 20`
+	err := chairDb.Select(&chairIDs, query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, ChairListResponse{[]Chair{}})
@@ -906,16 +893,14 @@ func searchEstates(c echo.Context) error {
 	return JSON(c, http.StatusOK, res)
 }
 
-var lowPricedEstateQuery = `SELECT id FROM estate ORDER BY rent ASC, id ASC LIMIT 20`
-var lowPricedEstateStmt *sqlx.Stmt
-
 func getLowPricedEstate(c echo.Context) error {
 	if val, ok := lowPriced.Load("estate"); ok {
 		return JSON(c, http.StatusOK, EstateListResponse{Estates: val.([]Estate)})
 	}
 	estateIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(estateIDs)
-	err := lowPricedEstateStmt.Select(&estateIDs)
+	query := `SELECT id FROM estate ORDER BY rent ASC, id ASC LIMIT 20`
+	err := estateDb.Select(&estateIDs, query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateListResponse{[]Estate{}})
