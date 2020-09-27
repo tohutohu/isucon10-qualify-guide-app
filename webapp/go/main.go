@@ -233,7 +233,7 @@ func getEnv(key, defaultValue string) string {
 
 //ConnectDB isuumoデータベースに接続する
 func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
-	dsn := strings.Join([]string{mc.User, ":", mc.Password, "@tcp(", mc.Host, ":", mc.Port, ")/", mc.DBName}, "")
+	dsn := strings.Join([]string{mc.User, ":", mc.Password, "@tcp(", mc.Host, ":", mc.Port, ")/", mc.DBName, "?interpolateParams=true"}, "")
 	return sqlx.Open("mysql", dsn)
 }
 
@@ -1009,8 +1009,20 @@ func searchEstateNazotte(c echo.Context) error {
 	b := coordinates.getBoundingBox()
 	estateIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(estateIDs)
-	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(%s), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`, coordinates.coordinatesToText())
-	err = estateDb.Select(&estateIDs, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, NazotteLimit)
+
+	txt := builderPool.Get().(*strings.Builder)
+	defer putBuilderPool(txt)
+	txt.WriteString("POLYGON((")
+	for idx, c := range coordinates.Coordinates {
+		if idx > 0 {
+			txt.WriteRune(',')
+		}
+		txt.WriteString(fmt.Sprintf("%f %f", c.Latitude, c.Longitude))
+	}
+	txt.WriteString("))")
+
+	query := `SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(?), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`
+	err = estateDb.Select(&estateIDs, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, txt.String(), NazotteLimit)
 	if err == sql.ErrNoRows {
 		return JSON(c, http.StatusOK, emptyEstateSearchResponse)
 	} else if err != nil {
@@ -1099,27 +1111,13 @@ func (cs Coordinates) getBoundingBox() BoundingBox {
 
 var builderPool = sync.Pool{
 	New: func() interface{} {
-		builder := strings.Builder{}
+		builder := &strings.Builder{}
 		builder.Grow(1024 * 1024)
 		return builder
 	},
 }
 
-func putBuilderPool(builder strings.Builder) {
+func putBuilderPool(builder *strings.Builder) {
 	builder.Reset()
 	builderPool.Put(builder)
-}
-
-func (cs Coordinates) coordinatesToText() string {
-	txt := strings.Builder{}
-	txt.Grow(1024)
-	txt.WriteString("'POLYGON((")
-	for idx, c := range cs.Coordinates {
-		if idx > 0 {
-			txt.WriteRune(',')
-		}
-		txt.WriteString(fmt.Sprintf("%f %f", c.Latitude, c.Longitude))
-	}
-	txt.WriteString("))'")
-	return txt.String()
 }
