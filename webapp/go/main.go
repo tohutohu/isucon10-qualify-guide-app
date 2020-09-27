@@ -260,13 +260,13 @@ func init() {
 func reset() {
 	resetChair()
 	resetGetEstateCache()
-	resetLowPricedChairs()
+	resetLowPriced()
 }
 
-var lowPricedChairs sync.Map
+var lowPriced sync.Map
 
-func resetLowPricedChairs() {
-	lowPricedChairs = sync.Map{}
+func resetLowPriced() {
+	lowPriced = sync.Map{}
 }
 
 var recommendCache map[int]EstateListResponse
@@ -504,7 +504,7 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	resetChair()
-	lowPricedChairs.Delete("cache")
+	lowPriced.Delete("chair")
 	return c.NoContent(http.StatusCreated)
 }
 
@@ -625,6 +625,7 @@ func buyChair(c echo.Context) error {
 		c.Echo().Logger.Infof("buyChair chair id \"%v\" not found", id)
 		return c.NoContent(http.StatusNotFound)
 	}
+	lowPriced.Delete("chair")
 
 	return c.NoContent(http.StatusOK)
 }
@@ -635,7 +636,7 @@ func getChairSearchCondition(c echo.Context) error {
 
 func getLowPricedChair(c echo.Context) error {
 	var chairs []Chair
-	if val, ok := lowPricedChairs.Load("cache"); ok {
+	if val, ok := lowPriced.Load("chair"); ok {
 		return JSON(c, http.StatusOK, ChairListResponse{Chairs: val.([]Chair)})
 	}
 	query := `SELECT id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT ?`
@@ -649,7 +650,7 @@ func getLowPricedChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	lowPricedChairs.Store("cache", chairs)
+	lowPriced.Store("chair", chairs)
 	return JSON(c, http.StatusOK, ChairListResponse{Chairs: chairs})
 }
 
@@ -727,6 +728,7 @@ func postEstate(c echo.Context) error {
 		c.Logger().Errorf("failed to insert estate: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	lowPriced.Delete("estate")
 	return c.NoContent(http.StatusCreated)
 }
 
@@ -811,6 +813,9 @@ func searchEstates(c echo.Context) error {
 }
 
 func getLowPricedEstate(c echo.Context) error {
+	if val, ok := lowPriced.Load("estate"); ok {
+		return JSON(c, http.StatusOK, EstateListResponse{Estates: val.([]Estate)})
+	}
 	estates := make([]Estate, 0, Limit)
 	query := `SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate ORDER BY rent ASC, id ASC LIMIT ?`
 	err := estateDb.Select(&estates, query, Limit)
@@ -822,6 +827,7 @@ func getLowPricedEstate(c echo.Context) error {
 		c.Logger().Errorf("getLowPricedEstate DB execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	lowPriced.Store("estate", estates)
 
 	return JSON(c, http.StatusOK, EstateListResponse{Estates: estates})
 }
