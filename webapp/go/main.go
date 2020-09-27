@@ -431,6 +431,17 @@ func initialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	var estates []Estate
+	query := `SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate`
+	err := estateDb.Select(&estates, query)
+	if err != nil {
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	for _, estate := range estates {
+		estateMap.Store(strconv.Itoa(int(estate.ID)), estate)
+	}
+
 	return JSON(c, http.StatusOK, InitializeResponse{
 		Language: "go",
 	})
