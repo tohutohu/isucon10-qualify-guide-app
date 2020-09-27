@@ -694,20 +694,34 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	defer f.Close()
-	buf, err := ioutil.ReadAll(f)
+	records, err := csv.NewReader(f).ReadAll()
 	if err != nil {
-		c.Logger().Errorf("failed to read file: %v", err)
+		c.Logger().Errorf("failed to read csv: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	replacer := strings.NewReplacer(",", "\",\"")
-	values := strings.Builder{}
-	values.Grow(8192 * 1024)
-	values.WriteString("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES (\"")
-	values.WriteString(strings.Join(strings.Split(replacer.Replace(string(buf)), "\n")[1:], "\"), (\""))
-	values.WriteString("\")")
 
-	fmt.Println(values.String())
-	_, err = estateDb.Exec(values.String())
+	values := make([]string, 0, 4096)
+	for _, row := range records {
+		rm := RecordMapper{Record: row}
+		id := rm.NextInt()
+		name := rm.NextString()
+		description := rm.NextString()
+		thumbnail := rm.NextString()
+		address := rm.NextString()
+		latitude := rm.NextFloat()
+		longitude := rm.NextFloat()
+		rent := rm.NextInt()
+		doorHeight := rm.NextInt()
+		doorWidth := rm.NextInt()
+		features := rm.NextString()
+		popularity := rm.NextInt()
+		if err := rm.Err(); err != nil {
+			c.Logger().Errorf("failed to read record: %v", err)
+			return c.NoContent(http.StatusBadRequest)
+		}
+		values = append(values, fmt.Sprintf(`(%d, "%s", "%s", "%s", "%s", %f, %f, %d, %d, %d, "%s", %d)`, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity))
+	}
+	_, err = estateDb.Exec("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES" + strings.Join(values, ","))
 	if err != nil {
 		c.Logger().Errorf("failed to insert estate: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
