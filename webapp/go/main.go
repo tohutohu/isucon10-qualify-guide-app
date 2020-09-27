@@ -439,7 +439,7 @@ func initialize(c echo.Context) error {
 	}
 
 	for _, estate := range estates {
-		estateMap.Store(strconv.Itoa(int(estate.ID)), estate)
+		estateMap.Store(int64(estate.ID), estate)
 	}
 
 	return JSON(c, http.StatusOK, InitializeResponse{
@@ -674,7 +674,7 @@ func getEstateDetail(c echo.Context) error {
 		c.Echo().Logger.Infof("Request parameter \"id\" parse error : %v", err)
 		return c.NoContent(http.StatusBadRequest)
 	}
-	if val, ok := estateMap.Load(c.Param("id")); ok {
+	if val, ok := estateMap.Load(id); ok {
 		return JSON(c, http.StatusOK, val)
 	}
 
@@ -689,7 +689,7 @@ func getEstateDetail(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	estateMap.Store(c.Param("id"), estate)
+	estateMap.Store(id, estate)
 	return JSON(c, http.StatusOK, estate)
 }
 
@@ -732,7 +732,7 @@ func postEstate(c echo.Context) error {
 		}
 		values = append(values, fmt.Sprintf(`(%d, "%s", "%s", "%s", "%s", %f, %f, %d, %d, %d, "%s", %d)`, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity))
 
-		estateMap.Store(strconv.Itoa(id), Estate{
+		estateMap.Store(int64(id), Estate{
 			ID:          int64(id),
 			Name:        name,
 			Description: description,
@@ -808,7 +808,7 @@ func searchEstates(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	searchQuery := "SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate WHERE "
+	searchQuery := "SELECT id FROM estate WHERE "
 	countQuery := "SELECT COUNT(*) FROM estate WHERE "
 	searchCondition := strings.Join(conditions, " AND ")
 	limitOffset := " ORDER BY popularity DESC, id ASC LIMIT ? OFFSET ?"
@@ -820,15 +820,20 @@ func searchEstates(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	estates := []Estate{}
+	estateIDs := []int64{}
 	params = append(params, perPage, page*perPage)
-	err = estateDb.Select(&estates, searchQuery+searchCondition+limitOffset, params...)
+	err = estateDb.Select(&estateIDs, searchQuery+searchCondition+limitOffset, params...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateSearchResponse{Count: 0, Estates: []Estate{}})
 		}
 		c.Logger().Errorf("searchEstates DB execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+	estates := make([]Estate, len(estateIDs))
+	for idx, id := range estateIDs {
+		val, _ := estateMap.Load(id)
+		estates[idx] = val.(Estate)
 	}
 
 	res.Estates = estates
@@ -840,9 +845,9 @@ func getLowPricedEstate(c echo.Context) error {
 	if val, ok := lowPriced.Load("estate"); ok {
 		return JSON(c, http.StatusOK, EstateListResponse{Estates: val.([]Estate)})
 	}
-	estates := make([]Estate, 0, Limit)
-	query := `SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate ORDER BY rent ASC, id ASC LIMIT ?`
-	err := estateDb.Select(&estates, query, Limit)
+	estateIDs := make([]int64, 0, Limit)
+	query := `SELECT id FROM estate ORDER BY rent ASC, id ASC LIMIT ?`
+	err := estateDb.Select(&estateIDs, query, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.Logger().Error("getLowPricedEstate not found")
@@ -851,6 +856,12 @@ func getLowPricedEstate(c echo.Context) error {
 		c.Logger().Errorf("getLowPricedEstate DB execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	estates := make([]Estate, len(estateIDs))
+	for idx, id := range estateIDs {
+		val, _ := estateMap.Load(id)
+		estates[idx] = val.(Estate)
+	}
+
 	lowPriced.Store("estate", estates)
 
 	return JSON(c, http.StatusOK, EstateListResponse{Estates: estates})
@@ -862,12 +873,6 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 		c.Logger().Infof("Invalid format searchRecommendedEstateWithChair id : %v", err)
 		return c.NoContent(http.StatusBadRequest)
 	}
-	recommendCacheMux.RLock()
-	if res, ok := recommendCache[id]; ok {
-		recommendCacheMux.RUnlock()
-		return JSON(c, http.StatusOK, res)
-	}
-	recommendCacheMux.RUnlock()
 
 	chair := Chair{}
 	query := `SELECT height, width, depth FROM chair WHERE id = ?`
@@ -881,7 +886,7 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	var estates []Estate
+	var estateIDs []int64
 	w := chair.Width
 	h := chair.Height
 	d := chair.Depth
@@ -891,8 +896,8 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	if h > d {
 		h, d = d, h
 	}
-	query = `SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
-	err = estateDb.Select(&estates, query, w, h, h, w, Limit)
+	query = `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
+	err = estateDb.Select(&estateIDs, query, w, h, h, w, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			recommendCacheMux.Lock()
@@ -904,11 +909,13 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 		c.Logger().Errorf("Database execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	estates := make([]Estate, len(estateIDs))
+	for idx, id := range estateIDs {
+		val, _ := estateMap.Load(id)
+		estates[idx] = val.(Estate)
+	}
 
-	recommendCacheMux.Lock()
-	defer recommendCacheMux.Unlock()
-	recommendCache[id] = EstateListResponse{Estates: estates}
-	return JSON(c, http.StatusOK, recommendCache[id])
+	return JSON(c, http.StatusOK, EstateListResponse{estates})
 }
 
 func searchEstateNazotte(c echo.Context) error {
@@ -924,8 +931,8 @@ func searchEstateNazotte(c echo.Context) error {
 	}
 
 	b := coordinates.getBoundingBox()
-	estatesInPolygon := []Estate{}
-	query := fmt.Sprintf(`SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(%s), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`, coordinates.coordinatesToText())
+	estatesInPolygon := []int64{}
+	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(%s), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`, coordinates.coordinatesToText())
 	err = estateDb.Select(&estatesInPolygon, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, NazotteLimit)
 	if err == sql.ErrNoRows {
 		c.Echo().Logger.Infof("SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate where latitude ...", err)
@@ -936,11 +943,10 @@ func searchEstateNazotte(c echo.Context) error {
 	}
 
 	var re EstateSearchResponse
-	re.Estates = []Estate{}
-	if len(estatesInPolygon) > NazotteLimit {
-		re.Estates = estatesInPolygon[:NazotteLimit]
-	} else {
-		re.Estates = estatesInPolygon
+	re.Estates = make([]Estate, len(estatesInPolygon))
+	for idx, id := range estatesInPolygon {
+		val, _ := estateMap.Load(id)
+		re.Estates[idx] = val.(Estate)
 	}
 	re.Count = int64(len(re.Estates))
 
@@ -966,7 +972,7 @@ func postEstateRequestDocument(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	if val, ok := estateMap.Load(c.Param("id")); ok {
+	if val, ok := estateMap.Load(id); ok {
 		return JSON(c, http.StatusOK, val)
 	}
 	estate := Estate{}
@@ -980,7 +986,7 @@ func postEstateRequestDocument(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	estateMap.Store(c.Param("id"), estate)
+	estateMap.Store(id, estate)
 	return c.NoContent(http.StatusOK)
 }
 
