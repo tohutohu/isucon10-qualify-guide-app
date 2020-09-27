@@ -15,12 +15,14 @@ import (
 	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/goccy/go-json"
 	"github.com/jmoiron/sqlx"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"golang.org/x/sync/errgroup"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 const Limit = 20
 const NazotteLimit = 50
