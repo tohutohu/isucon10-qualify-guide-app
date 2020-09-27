@@ -367,6 +367,15 @@ func main() {
 	}
 	estateDb.SetMaxOpenConns(100)
 	defer estateDb.Close()
+	recommendStmt, err = estateDb.Preparex(recommendQuery)
+	if err != nil {
+		e.Logger.Fatalf("DB prepare failed : %v", err)
+	}
+
+	lowPricedEstateStmt, err = estateDb.Preparex(lowPricedEstateQuery)
+	if err != nil {
+		e.Logger.Fatalf("DB prepare failed : %v", err)
+	}
 
 	chairDb, err = chairMySQLConnectionData.ConnectDB()
 	if err != nil {
@@ -374,6 +383,14 @@ func main() {
 	}
 	chairDb.SetMaxOpenConns(100)
 	defer chairDb.Close()
+	lowPricedChairStmt, err = chairDb.Preparex(lowPricedChairQuery)
+	if err != nil {
+		e.Logger.Fatalf("DB prepare failed : %v", err)
+	}
+	buyChairStmt, err = chairDb.Preparex(buyChairQuery)
+	if err != nil {
+		e.Logger.Fatalf("DB prepare failed : %v", err)
+	}
 
 	// ここからソケット接続設定 ---
 	socket_file := "/var/run/app.sock"
@@ -515,7 +532,8 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	query := strings.Builder{}
+	query := builderPool.Get().(strings.Builder)
+	defer putBuilderPool(query)
 	query.WriteString("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES")
 	for idx, row := range records {
 		rm := RecordMapper{Record: row}
@@ -658,6 +676,9 @@ func searchChairs(c echo.Context) error {
 	return JSON(c, http.StatusOK, res)
 }
 
+var buyChairQuery = "UPDATE chair SET stock = stock - 1 WHERE id = ?"
+var buyChairStmt *sqlx.Stmt
+
 func buyChair(c echo.Context) error {
 	m := echo.Map{}
 	if err := c.Bind(&m); err != nil {
@@ -682,7 +703,7 @@ func buyChair(c echo.Context) error {
 	chair.Stock--
 	chairMap.Store(int64(id), chair)
 
-	_, err = chairDb.Exec("UPDATE chair SET stock = stock - 1 WHERE id = ?", id)
+	_, err = buyChairStmt.Exec(id)
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -695,14 +716,16 @@ func getChairSearchCondition(c echo.Context) error {
 	return JSON(c, http.StatusOK, chairSearchCondition)
 }
 
+var lowPricedChairQuery = `SELECT id FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT 20`
+var lowPricedChairStmt *sqlx.Stmt
+
 func getLowPricedChair(c echo.Context) error {
 	if val, ok := lowPriced.Load("chair"); ok {
 		return JSON(c, http.StatusOK, ChairListResponse{Chairs: val.([]Chair)})
 	}
 	chairIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(chairIDs)
-	query := `SELECT id FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT ?`
-	err := chairDb.Select(&chairIDs, query, Limit)
+	err := lowPricedChairStmt.Select(&chairIDs)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, ChairListResponse{[]Chair{}})
@@ -749,7 +772,8 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	query := strings.Builder{}
+	query := builderPool.Get().(strings.Builder)
+	defer putBuilderPool(query)
 	query.WriteString("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES")
 	for idx, row := range records {
 		rm := RecordMapper{Record: row}
@@ -893,14 +917,16 @@ func searchEstates(c echo.Context) error {
 	return JSON(c, http.StatusOK, res)
 }
 
+var lowPricedEstateQuery = `SELECT id FROM estate ORDER BY rent ASC, id ASC LIMIT 20`
+var lowPricedEstateStmt *sqlx.Stmt
+
 func getLowPricedEstate(c echo.Context) error {
 	if val, ok := lowPriced.Load("estate"); ok {
 		return JSON(c, http.StatusOK, EstateListResponse{Estates: val.([]Estate)})
 	}
 	estateIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(estateIDs)
-	query := `SELECT id FROM estate ORDER BY rent ASC, id ASC LIMIT ?`
-	err := estateDb.Select(&estateIDs, query, Limit)
+	err := lowPricedEstateStmt.Select(&estateIDs)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateListResponse{[]Estate{}})
@@ -917,6 +943,9 @@ func getLowPricedEstate(c echo.Context) error {
 
 	return JSON(c, http.StatusOK, EstateListResponse{Estates: estates})
 }
+
+var recommendQuery = `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
+var recommendStmt *sqlx.Stmt
 
 func searchRecommendedEstateWithChair(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -938,13 +967,11 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	if h > d {
 		h, d = d, h
 	}
-	query := `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
-	err = estateDb.Select(&estateIDs, query, w, h, h, w, Limit)
+	err = recommendStmt.Select(&estateIDs, w, h, h, w, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateListResponse{[]Estate{}})
 		}
-		c.Logger().Errorf("Database execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	estates := estatesPool.Get().([]Estate)
@@ -1072,10 +1099,29 @@ func (cs Coordinates) getBoundingBox() BoundingBox {
 	return boundingBox
 }
 
+var builderPool = sync.Pool{
+	New: func() interface{} {
+		builder := strings.Builder{}
+		builder.Grow(1024 * 1024)
+		return builder
+	},
+}
+
+func putBuilderPool(builder strings.Builder) {
+	builder.Reset()
+	builderPool.Put(builder)
+}
+
 func (cs Coordinates) coordinatesToText() string {
-	points := make([]string, 0, len(cs.Coordinates))
-	for _, c := range cs.Coordinates {
-		points = append(points, fmt.Sprintf("%f %f", c.Latitude, c.Longitude))
+	txt := builderPool.Get().(strings.Builder)
+	defer putBuilderPool(txt)
+	txt.WriteString("'POLYGON((")
+	for idx, c := range cs.Coordinates {
+		if idx > 0 {
+			txt.WriteRune(',')
+		}
+		txt.WriteString(fmt.Sprintf("%f %f", c.Latitude, c.Longitude))
 	}
-	return fmt.Sprintf("'POLYGON((%s))'", strings.Join(points, ","))
+	txt.WriteString("))'")
+	return txt.String()
 }
