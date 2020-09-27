@@ -532,8 +532,7 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	query := builderPool.Get().(strings.Builder)
-	defer putBuilderPool(query)
+	query := strings.Builder{}
 	query.WriteString("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES")
 	for idx, row := range records {
 		rm := RecordMapper{Record: row}
@@ -772,8 +771,7 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	query := builderPool.Get().(strings.Builder)
-	defer putBuilderPool(query)
+	query := strings.Builder{}
 	query.WriteString("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES")
 	for idx, row := range records {
 		rm := RecordMapper{Record: row}
@@ -1113,8 +1111,8 @@ func putBuilderPool(builder strings.Builder) {
 }
 
 func (cs Coordinates) coordinatesToText() string {
-	txt := builderPool.Get().(strings.Builder)
-	defer putBuilderPool(txt)
+	txt := strings.Builder{}
+	txt.Grow(1024)
 	txt.WriteString("'POLYGON((")
 	for idx, c := range cs.Coordinates {
 		if idx > 0 {
