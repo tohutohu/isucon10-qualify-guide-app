@@ -290,13 +290,11 @@ func putChairsPool(chairs []Chair) {
 }
 
 var estateMap sync.Map
-var chairMap sync.Map
 
 func reset() {
 	resetChair()
 	resetLowPriced()
 	estateMap = sync.Map{}
-	chairMap = sync.Map{}
 }
 
 var lowPriced sync.Map
@@ -457,17 +455,7 @@ func initialize(c echo.Context) error {
 	}
 
 	for _, estate := range estates {
-		estateMap.Store(estate.ID, estate)
-	}
-
-	var chairs []Chair
-	query = `SELECT id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock FROM chair`
-	err = chairDb.Select(&chairs, query)
-	if err != nil {
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	for _, chair := range chairs {
-		chairMap.Store(chair.ID, chair)
+		estateMap.Store(int64(estate.ID), estate)
 	}
 
 	return JSON(c, http.StatusOK, InitializeResponse{
@@ -487,13 +475,19 @@ func getChairDetail(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	if val, ok := chairMap.Load(int64(id)); ok {
-		if (val.(Chair)).Stock == 0 {
+	var chair Chair
+	query := `SELECT id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock FROM chair WHERE id = ?`
+	err = chairDb.Get(&chair, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
 			return c.NoContent(http.StatusNotFound)
 		}
-		return JSON(c, http.StatusOK, val)
+		return c.NoContent(http.StatusInternalServerError)
+	} else if chair.Stock <= 0 {
+		return c.NoContent(http.StatusNotFound)
 	}
-	return c.NoContent(http.StatusNotFound)
+
+	return JSON(c, http.StatusOK, chair)
 }
 
 func postChair(c echo.Context) error {
@@ -535,22 +529,6 @@ func postChair(c echo.Context) error {
 			return c.NoContent(http.StatusBadRequest)
 		}
 		values = append(values, fmt.Sprintf(`(%d, "%s", "%s", "%s", %d, %d, %d, %d, "%s", "%s", "%s", %d, %d)`, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock))
-
-		chairMap.Store(int64(id), Chair{
-			ID:          int64(id),
-			Name:        name,
-			Description: description,
-			Thumbnail:   thumbnail,
-			Price:       int64(price),
-			Height:      int64(height),
-			Width:       int64(width),
-			Depth:       int64(depth),
-			Color:       color,
-			Features:    features,
-			Kind:        kind,
-			Popularity:  int64(popularity),
-			Stock:       int64(stock),
-		})
 	}
 	_, err = chairDb.Exec("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES" + strings.Join(values, ","))
 	if err != nil {
@@ -671,10 +649,6 @@ func buyChair(c echo.Context) error {
 		return c.NoContent(http.StatusNotFound)
 	}
 	lowPriced.Delete("chair")
-	_chair, _ := chairMap.Load(int64(id))
-	chair := _chair.(Chair)
-	chair.Stock--
-	chairMap.Store(int64(id), chair)
 
 	return c.NoContent(http.StatusOK)
 }
