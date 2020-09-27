@@ -28,8 +28,8 @@ const NazotteLimit = 50
 
 var estateDb *sqlx.DB
 var chairDb *sqlx.DB
-var estateMySQLConnectionData *MySQLConnectionEnv
-var chairMySQLConnectionData *MySQLConnectionEnv
+var estateMySQLConnectionData MySQLConnectionEnv
+var chairMySQLConnectionData MySQLConnectionEnv
 var chairSearchCondition ChairSearchCondition
 var estateSearchCondition EstateSearchCondition
 
@@ -203,8 +203,8 @@ func (r *RecordMapper) Err() error {
 	return r.err
 }
 
-func NewEstateMySQLConnectionEnv() *MySQLConnectionEnv {
-	return &MySQLConnectionEnv{
+func NewEstateMySQLConnectionEnv() MySQLConnectionEnv {
+	return MySQLConnectionEnv{
 		Host:     getEnv("MYSQL_ESTATE_HOST", "127.0.0.1"),
 		Port:     getEnv("MYSQL_ESTATE_PORT", "3306"),
 		User:     getEnv("MYSQL_ESTATE_USER", "isucon"),
@@ -213,8 +213,8 @@ func NewEstateMySQLConnectionEnv() *MySQLConnectionEnv {
 	}
 }
 
-func NewChairMySQLConnectionEnv() *MySQLConnectionEnv {
-	return &MySQLConnectionEnv{
+func NewChairMySQLConnectionEnv() MySQLConnectionEnv {
+	return MySQLConnectionEnv{
 		Host:     getEnv("MYSQL_CHAIR_HOST", "127.0.0.1"),
 		Port:     getEnv("MYSQL_CHAIR_PORT", "3306"),
 		User:     getEnv("MYSQL_CHAIR_USER", "isucon"),
@@ -252,9 +252,7 @@ func init() {
 	}
 	json.Unmarshal(jsonText, &estateSearchCondition)
 
-	getEstateCacheMux = sync.RWMutex{}
 	recommendCacheMux = sync.RWMutex{}
-	getEstateCache = make(map[int]Estate)
 	reset()
 }
 
@@ -295,7 +293,6 @@ var estateMap sync.Map
 
 func reset() {
 	resetChair()
-	resetGetEstateCache()
 	resetLowPriced()
 	estateMap = sync.Map{}
 }
@@ -311,19 +308,6 @@ var recommendCacheMux sync.RWMutex
 
 func resetChair() {
 	recommendCache = make(map[int]EstateListResponse)
-}
-
-var getEstateCache map[int]Estate
-var getEstateCacheMux sync.RWMutex
-
-func resetGetEstateCache() {
-	next := make(map[int]Estate)
-	for key, val := range getEstateCache {
-		if key <= 30000 {
-			next[key] = val
-		}
-	}
-	getEstateCache = next
 }
 
 func JSON(c echo.Context, code int, i interface{}) error {
@@ -364,11 +348,11 @@ func main() {
 	e.GET("/api/recommended_estate/:id", searchRecommendedEstateWithChair)
 
 	{
-		e.Any("/debug/pprof/", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
 		e.Any("/debug/pprof/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
 		e.Any("/debug/pprof/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
 		e.Any("/debug/pprof/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
 		e.Any("/debug/pprof/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+		e.Any("/debug/pprof/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
 	}
 
 	estateMySQLConnectionData = NewEstateMySQLConnectionEnv()
@@ -557,8 +541,10 @@ func postChair(c echo.Context) error {
 }
 
 func searchChairs(c echo.Context) error {
-	conditions := make([]string, 0)
-	params := make([]interface{}, 0)
+	conditions := conditionsPool.Get().([]string)
+	defer putConditionsPool(conditions)
+	params := paramsPool.Get().([]interface{})
+	defer putParamsPool(params)
 
 	if c.QueryParam("priceRangeId") != "" {
 		conditions = append(conditions, "price_id = ?")
@@ -790,30 +776,54 @@ func postEstate(c echo.Context) error {
 	return c.NoContent(http.StatusCreated)
 }
 
+var paramsPool = sync.Pool{
+	New: func() interface{} {
+		return make([]interface{}, 0, 20)
+	},
+}
+
+func putParamsPool(params []interface{}) {
+	params = params[:0]
+	paramsPool.Put(params)
+}
+
+var conditionsPool = sync.Pool{
+	New: func() interface{} {
+		return make([]string, 0, 20)
+	},
+}
+
+func putConditionsPool(conditions []string) {
+	conditions = conditions[:0]
+	conditionsPool.Put(conditions)
+}
+
 func searchEstates(c echo.Context) error {
-	conditions := make([]string, 0)
-	params := make([]interface{}, 0)
+	conditions := conditionsPool.Get().([]string)
+	defer putConditionsPool(conditions)
+	params := paramsPool.Get().([]interface{})
+	defer putParamsPool(params)
 
 	if c.QueryParam("doorHeightRangeId") != "" {
-		if _, err := strconv.Atoi(c.QueryParam("doorHeightRangeId")); err != nil {
-			return c.NoContent(http.StatusBadRequest)
-		}
+		// if _, err := strconv.Atoi(c.QueryParam("doorHeightRangeId")); err != nil {
+		// 	return c.NoContent(http.StatusBadRequest)
+		// }
 		conditions = append(conditions, "door_height_id = ?")
 		params = append(params, c.QueryParam("doorHeightRangeId"))
 	}
 
 	if c.QueryParam("doorWidthRangeId") != "" {
-		if _, err := strconv.Atoi(c.QueryParam("doorWidthRangeId")); err != nil {
-			return c.NoContent(http.StatusBadRequest)
-		}
+		// if _, err := strconv.Atoi(c.QueryParam("doorWidthRangeId")); err != nil {
+		// 	return c.NoContent(http.StatusBadRequest)
+		// }
 		conditions = append(conditions, "door_width_id = ?")
 		params = append(params, c.QueryParam("doorWidthRangeId"))
 	}
 
 	if c.QueryParam("rentRangeId") != "" {
-		if _, err := strconv.Atoi(c.QueryParam("rentRangeId")); err != nil {
-			return c.NoContent(http.StatusBadRequest)
-		}
+		// if _, err := strconv.Atoi(c.QueryParam("rentRangeId")); err != nil {
+		// 	return c.NoContent(http.StatusBadRequest)
+		// }
 		conditions = append(conditions, "rent_id = ?")
 		params = append(params, c.QueryParam("rentRangeId"))
 	}
@@ -957,8 +967,15 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	return JSON(c, http.StatusOK, EstateListResponse{estates})
 }
 
+var emptyEstateSearchResponse = EstateSearchResponse{Count: 0, Estates: []Estate{}}
+var coordinatePool = sync.Pool{
+	New: func() interface{} {
+		return Coordinates{}
+	},
+}
+
 func searchEstateNazotte(c echo.Context) error {
-	coordinates := Coordinates{}
+	coordinates := coordinatePool.Get().(Coordinates)
 	err := c.Bind(&coordinates)
 	if err != nil {
 		c.Echo().Logger.Infof("post search estate nazotte failed : %v", err)
@@ -976,7 +993,7 @@ func searchEstateNazotte(c echo.Context) error {
 	err = estateDb.Select(&estateIDs, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, NazotteLimit)
 	if err == sql.ErrNoRows {
 		c.Echo().Logger.Infof("SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate where latitude ...", err)
-		return JSON(c, http.StatusOK, EstateSearchResponse{Count: 0, Estates: []Estate{}})
+		return JSON(c, http.StatusOK, emptyEstateSearchResponse)
 	} else if err != nil {
 		c.Echo().Logger.Errorf("database execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
