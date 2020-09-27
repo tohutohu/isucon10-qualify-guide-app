@@ -267,15 +267,15 @@ func putEstatesPool(estates []Estate) {
 	estatesPool.Put(estates)
 }
 
-var estateIDsPool = sync.Pool{
+var IDsPool = sync.Pool{
 	New: func() interface{} {
 		return make([]int64, 0, 100)
 	},
 }
 
-func putEstateIDsPool(estateIDs []int64) {
+func putIDsPool(estateIDs []int64) {
 	estateIDs = estateIDs[:0]
-	estateIDsPool.Put(estateIDs)
+	IDsPool.Put(estateIDs)
 }
 
 var chairsPool = sync.Pool{
@@ -620,7 +620,7 @@ func searchChairs(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	searchQuery := "SELECT id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock FROM chair WHERE "
+	searchQuery := "SELECT id FROM chair WHERE "
 	countQuery := "SELECT COUNT(*) FROM chair WHERE "
 	searchCondition := strings.Join(conditions, " AND ")
 	limitOffset := " ORDER BY popularity DESC, id ASC LIMIT ? OFFSET ?"
@@ -631,14 +631,22 @@ func searchChairs(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	chairs := []Chair{}
+	chairIDs := IDsPool.Get().([]int64)
+	defer putIDsPool(chairIDs)
 	params = append(params, perPage, page*perPage)
-	err = chairDb.Select(&chairs, searchQuery+searchCondition+limitOffset, params...)
+	err = chairDb.Select(&chairIDs, searchQuery+searchCondition+limitOffset, params...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, ChairSearchResponse{Count: 0, Chairs: []Chair{}})
 		}
 		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	chairs := chairsPool.Get().([]Chair)
+	defer putChairsPool(chairs)
+	for _, id := range chairIDs {
+		val, _ := chairMap.Load(id)
+		chairs = append(chairs, val.(Chair))
 	}
 
 	res.Chairs = chairs
@@ -684,17 +692,23 @@ func getChairSearchCondition(c echo.Context) error {
 }
 
 func getLowPricedChair(c echo.Context) error {
-	var chairs []Chair
 	if val, ok := lowPriced.Load("chair"); ok {
 		return JSON(c, http.StatusOK, ChairListResponse{Chairs: val.([]Chair)})
 	}
-	query := `SELECT id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT ?`
-	err := chairDb.Select(&chairs, query, Limit)
+	chairIDs := IDsPool.Get().([]int64)
+	defer putIDsPool(chairIDs)
+	query := `SELECT id FROM chair WHERE stock > 0 ORDER BY price ASC, id ASC LIMIT ?`
+	err := chairDb.Select(&chairIDs, query, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, ChairListResponse{[]Chair{}})
 		}
 		return c.NoContent(http.StatusInternalServerError)
+	}
+	chairs := make([]Chair, len(chairIDs))
+	for idx, id := range chairIDs {
+		val, _ := chairMap.Load(id)
+		chairs[idx] = val.(Chair)
 	}
 
 	lowPriced.Store("chair", chairs)
@@ -849,8 +863,8 @@ func searchEstates(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	estateIDs := estateIDsPool.Get().([]int64)
-	defer putEstateIDsPool(estateIDs)
+	estateIDs := IDsPool.Get().([]int64)
+	defer putIDsPool(estateIDs)
 	params = append(params, perPage, page*perPage)
 	err = estateDb.Select(&estateIDs, searchQuery+searchCondition+limitOffset, params...)
 	if err != nil {
@@ -875,8 +889,8 @@ func getLowPricedEstate(c echo.Context) error {
 	if val, ok := lowPriced.Load("estate"); ok {
 		return JSON(c, http.StatusOK, EstateListResponse{Estates: val.([]Estate)})
 	}
-	estateIDs := estateIDsPool.Get().([]int64)
-	defer putEstateIDsPool(estateIDs)
+	estateIDs := IDsPool.Get().([]int64)
+	defer putIDsPool(estateIDs)
 	query := `SELECT id FROM estate ORDER BY rent ASC, id ASC LIMIT ?`
 	err := estateDb.Select(&estateIDs, query, Limit)
 	if err != nil {
@@ -912,8 +926,8 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	estateIDs := estateIDsPool.Get().([]int64)
-	defer putEstateIDsPool(estateIDs)
+	estateIDs := IDsPool.Get().([]int64)
+	defer putIDsPool(estateIDs)
 	w := chair.Width
 	h := chair.Height
 	d := chair.Depth
@@ -971,8 +985,8 @@ func searchEstateNazotte(c echo.Context) error {
 	}
 
 	b := coordinates.getBoundingBox()
-	estateIDs := estateIDsPool.Get().([]int64)
-	defer putEstateIDsPool(estateIDs)
+	estateIDs := IDsPool.Get().([]int64)
+	defer putIDsPool(estateIDs)
 	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(%s), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`, coordinates.coordinatesToText())
 	err = estateDb.Select(&estateIDs, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, NazotteLimit)
 	if err == sql.ErrNoRows {
