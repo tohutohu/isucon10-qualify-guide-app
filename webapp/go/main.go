@@ -924,15 +924,8 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	chair := Chair{}
-	query := `SELECT height, width, depth FROM chair WHERE id = ?`
-	err = chairDb.Get(&chair, query, id)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.NoContent(http.StatusBadRequest)
-		}
-		return c.NoContent(http.StatusInternalServerError)
-	}
+	_chair, _ := chairMap.Load(int64(id))
+	chair := _chair.(Chair)
 
 	estateIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(estateIDs)
@@ -945,14 +938,10 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	if h > d {
 		h, d = d, h
 	}
-	query = `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
+	query := `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
 	err = estateDb.Select(&estateIDs, query, w, h, h, w, Limit)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			recommendCacheMux.Lock()
-			recommendCache[id] = EstateListResponse{[]Estate{}}
-			recommendCacheMux.Unlock()
-
 			return JSON(c, http.StatusOK, EstateListResponse{[]Estate{}})
 		}
 		c.Logger().Errorf("Database execution error : %v", err)
