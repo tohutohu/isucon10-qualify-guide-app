@@ -232,8 +232,8 @@ CREATE UNIQUE INDEX idx20 on isuumo.chair(price_id, color, stock, popularity des
 # CREATE UNIQUE INDEX idx27 on isuumo.chair(price_id, height_id, depth_id, stock, popularity desc, id);
 # CREATE UNIQUE INDEX idx28 on isuumo.chair(height_id, depth_id, color, stock, popularity desc, id);
 
-SET GLOBAL slow_query_log='ON';
-SET GLOBAL long_query_time=0;
-SET GLOBAL slow_query_log_file='/var/log/mysql/slow.log';
+# SET GLOBAL slow_query_log='ON';
+# SET GLOBAL long_query_time=0;
+# SET GLOBAL slow_query_log_file='/var/log/mysql/slow.log';
 
 SET GLOBAL unique_checks=0;
