@@ -365,14 +365,16 @@ func main() {
 	if err != nil {
 		e.Logger.Fatalf("DB connection failed : %v", err)
 	}
-	estateDb.SetMaxOpenConns(100)
+	estateDb.SetMaxOpenConns(200)
+	estateDb.SetMaxIdleConns(200)
 	defer estateDb.Close()
 
 	chairDb, err = chairMySQLConnectionData.ConnectDB()
 	if err != nil {
 		e.Logger.Fatalf("DB connection failed : %v", err)
 	}
-	chairDb.SetMaxOpenConns(100)
+	chairDb.SetMaxOpenConns(200)
+	chairDb.SetMaxIdleConns(200)
 	defer chairDb.Close()
 
 	// ここからソケット接続設定 ---
