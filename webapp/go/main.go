@@ -515,8 +515,9 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	values := make([]string, 0, 4096)
-	for _, row := range records {
+	query := strings.Builder{}
+	query.WriteString("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES")
+	for idx, row := range records {
 		rm := RecordMapper{Record: row}
 		id := rm.NextInt()
 		name := rm.NextString()
@@ -534,7 +535,10 @@ func postChair(c echo.Context) error {
 		if err := rm.Err(); err != nil {
 			return c.NoContent(http.StatusBadRequest)
 		}
-		values = append(values, fmt.Sprintf(`(%d, "%s", "%s", "%s", %d, %d, %d, %d, "%s", "%s", "%s", %d, %d)`, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock))
+		if idx > 0 {
+			query.WriteString(",")
+		}
+		query.WriteString(fmt.Sprintf(`(%d, "%s", "%s", "%s", %d, %d, %d, %d, "%s", "%s", "%s", %d, %d)`, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock))
 
 		chairMap.Store(int64(id), Chair{
 			ID:          int64(id),
@@ -552,7 +556,7 @@ func postChair(c echo.Context) error {
 			Stock:       int64(stock),
 		})
 	}
-	_, err = chairDb.Exec("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES" + strings.Join(values, ","))
+	_, err = chairDb.Exec(query.String())
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -745,8 +749,9 @@ func postEstate(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	values := make([]string, 0, 4096)
-	for _, row := range records {
+	query := strings.Builder{}
+	query.WriteString("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES")
+	for idx, row := range records {
 		rm := RecordMapper{Record: row}
 		id := rm.NextInt()
 		name := rm.NextString()
@@ -763,7 +768,10 @@ func postEstate(c echo.Context) error {
 		if err := rm.Err(); err != nil {
 			return c.NoContent(http.StatusBadRequest)
 		}
-		values = append(values, fmt.Sprintf(`(%d, "%s", "%s", "%s", "%s", %f, %f, %d, %d, %d, "%s", %d)`, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity))
+		if idx > 0 {
+			query.WriteString(",")
+		}
+		query.WriteString(fmt.Sprintf(`(%d, "%s", "%s", "%s", "%s", %f, %f, %d, %d, %d, "%s", %d)`, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity))
 
 		estateMap.Store(int64(id), Estate{
 			ID:          int64(id),
@@ -780,7 +788,7 @@ func postEstate(c echo.Context) error {
 			Popularity:  int64(popularity),
 		})
 	}
-	_, err = estateDb.Exec("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES" + strings.Join(values, ","))
+	_, err = estateDb.Exec(query.String())
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
