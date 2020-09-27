@@ -670,19 +670,19 @@ func buyChair(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	result, err := chairDb.Exec("UPDATE chair SET stock = stock - 1 WHERE stock > 0 AND id = ?", id)
-	if err != nil {
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
-	if affected, _ := result.RowsAffected(); affected == 0 {
+	_chair, ok := chairMap.Load(int64(id))
+	if !ok {
 		return c.NoContent(http.StatusNotFound)
 	}
-	lowPriced.Delete("chair")
-	_chair, _ := chairMap.Load(int64(id))
 	chair := _chair.(Chair)
 	chair.Stock--
 	chairMap.Store(int64(id), chair)
+
+	_, err = chairDb.Exec("UPDATE chair SET stock = stock - 1 WHERE id = ?", id)
+	if err != nil {
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	lowPriced.Delete("chair")
 
 	return c.NoContent(http.StatusOK)
 }
