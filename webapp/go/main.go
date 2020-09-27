@@ -233,7 +233,7 @@ func getEnv(key, defaultValue string) string {
 
 //ConnectDB isuumoデータベースに接続する
 func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
-	dsn := strings.Join([]string{mc.User, ":", mc.Password, "@tcp(", mc.Host, ":", mc.Port, ")/", mc.DBName, "?interpolateParams=true"}, "")
+	dsn := strings.Join([]string{mc.User, ":", mc.Password, "@tcp(", mc.Host, ":", mc.Port, ")/", mc.DBName}, "")
 	return sqlx.Open("mysql", dsn)
 }
 
@@ -516,7 +516,7 @@ func postChair(c echo.Context) error {
 	}
 
 	query := strings.Builder{}
-	query.WriteString("INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock) VALUES")
+	query.WriteString("INSERT INTO chair(id,name,description,thumbnail,price,height,width,depth,color,features,kind,popularity,stock) VALUES")
 	for idx, row := range records {
 		rm := RecordMapper{Record: row}
 		id := rm.NextInt()
@@ -538,7 +538,7 @@ func postChair(c echo.Context) error {
 		if idx > 0 {
 			query.WriteString(",")
 		}
-		query.WriteString(fmt.Sprintf(`(%d, "%s", "%s", "%s", %d, %d, %d, %d, "%s", "%s", "%s", %d, %d)`, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock))
+		query.WriteString(fmt.Sprintf(`(%d,"%s","%s","%s",%d,%d,%d,%d,"%s","%s","%s",%d,%d)`, id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock))
 
 		chairMap.Store(int64(id), Chair{
 			ID:          int64(id),
@@ -566,53 +566,75 @@ func postChair(c echo.Context) error {
 }
 
 func searchChairs(c echo.Context) error {
-	conditions := conditionsPool.Get().([]string)
-	defer putConditionsPool(conditions)
-	params := paramsPool.Get().([]interface{})
-	defer putParamsPool(params)
+	queryCondition := builderPool.Get().(*strings.Builder)
+	defer putBuilderPool(queryCondition)
 
 	if c.QueryParam("priceRangeId") != "" {
-		conditions = append(conditions, "price_id = ?")
-		params = append(params, c.QueryParam("priceRangeId"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("price_id=")
+		queryCondition.WriteString(c.QueryParam("priceRangeId"))
 	}
 
 	if c.QueryParam("heightRangeId") != "" {
-		conditions = append(conditions, "height_id = ?")
-		params = append(params, c.QueryParam("heightRangeId"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("height_id=")
+		queryCondition.WriteString(c.QueryParam("heightRangeId"))
 	}
 
 	if c.QueryParam("widthRangeId") != "" {
-		conditions = append(conditions, "width_id = ?")
-		params = append(params, c.QueryParam("widthRangeId"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("width_id=")
+		queryCondition.WriteString(c.QueryParam("widthRangeId"))
 	}
 
 	if c.QueryParam("depthRangeId") != "" {
-		conditions = append(conditions, "depth_id = ?")
-		params = append(params, c.QueryParam("depthRangeId"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("depth_id=")
+		queryCondition.WriteString(c.QueryParam("depthRangeId"))
 	}
 
 	if c.QueryParam("kind") != "" {
-		conditions = append(conditions, "kind = ?")
-		params = append(params, c.QueryParam("kind"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("kind='")
+		queryCondition.WriteString(c.QueryParam("kind"))
+		queryCondition.WriteString("'")
 	}
 
 	if c.QueryParam("color") != "" {
-		conditions = append(conditions, "color = ?")
-		params = append(params, c.QueryParam("color"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("color='")
+		queryCondition.WriteString(c.QueryParam("color"))
+		queryCondition.WriteString("'")
 	}
 
 	if c.QueryParam("features") != "" {
 		for _, f := range strings.Split(c.QueryParam("features"), ",") {
-			conditions = append(conditions, "FIND_IN_SET(?, features_set)>0")
-			params = append(params, f)
+			if queryCondition.Len() > 0 {
+				queryCondition.WriteString(" AND ")
+			}
+			queryCondition.WriteString("FIND_IN_SET('")
+			queryCondition.WriteString(f)
+			queryCondition.WriteString("',features_set)>0")
 		}
 	}
 
-	if len(conditions) == 0 {
+	if queryCondition.Len() == 0 {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	conditions = append(conditions, "stock > 0")
+	queryCondition.WriteString(" AND stock>0 ")
 
 	page, err := strconv.Atoi(c.QueryParam("page"))
 	if err != nil {
@@ -626,19 +648,17 @@ func searchChairs(c echo.Context) error {
 
 	searchQuery := "SELECT id FROM chair WHERE "
 	countQuery := "SELECT COUNT(*) FROM chair WHERE "
-	searchCondition := strings.Join(conditions, " AND ")
-	limitOffset := " ORDER BY popularity DESC, id ASC LIMIT ? OFFSET ?"
+	limitOffset := fmt.Sprintf(" ORDER BY popularity DESC, id ASC LIMIT %d OFFSET %d", perPage, page*perPage)
 
 	var res ChairSearchResponse
-	err = chairDb.Get(&res.Count, countQuery+searchCondition, params...)
+	err = chairDb.Get(&res.Count, countQuery+queryCondition.String())
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	chairIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(chairIDs)
-	params = append(params, perPage, page*perPage)
-	err = chairDb.Select(&chairIDs, searchQuery+searchCondition+limitOffset, params...)
+	err = chairDb.Select(&chairIDs, searchQuery+queryCondition.String()+limitOffset)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, ChairSearchResponse{Count: 0, Chairs: []Chair{}})
@@ -682,7 +702,7 @@ func buyChair(c echo.Context) error {
 	chair.Stock--
 	chairMap.Store(int64(id), chair)
 
-	_, err = chairDb.Exec("UPDATE chair SET stock = stock - 1 WHERE id = ?", id)
+	_, err = chairDb.Exec(fmt.Sprintf("UPDATE chair SET stock=stock-1 WHERE id=%s", c.Param("id")))
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -750,7 +770,7 @@ func postEstate(c echo.Context) error {
 	}
 
 	query := strings.Builder{}
-	query.WriteString("INSERT INTO estate(id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES")
+	query.WriteString("INSERT INTO estate(id,name,description,thumbnail,address,latitude,longitude,rent,door_height,door_width,features,popularity) VALUES")
 	for idx, row := range records {
 		rm := RecordMapper{Record: row}
 		id := rm.NextInt()
@@ -771,7 +791,7 @@ func postEstate(c echo.Context) error {
 		if idx > 0 {
 			query.WriteString(",")
 		}
-		query.WriteString(fmt.Sprintf(`(%d, "%s", "%s", "%s", "%s", %f, %f, %d, %d, %d, "%s", %d)`, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity))
+		query.WriteString(fmt.Sprintf(`(%d,"%s","%s","%s","%s",%f,%f,%d,%d,%d,"%s",%d)`, id, name, description, thumbnail, address, latitude, longitude, rent, doorHeight, doorWidth, features, popularity))
 
 		estateMap.Store(int64(id), Estate{
 			ID:          int64(id),
@@ -819,34 +839,41 @@ func putConditionsPool(conditions []string) {
 }
 
 func searchEstates(c echo.Context) error {
-	conditions := conditionsPool.Get().([]string)
-	defer putConditionsPool(conditions)
-	params := paramsPool.Get().([]interface{})
-	defer putParamsPool(params)
-
+	queryCondition := builderPool.Get().(*strings.Builder)
+	defer putBuilderPool(queryCondition)
 	if c.QueryParam("doorHeightRangeId") != "" {
-		conditions = append(conditions, "door_height_id = ?")
-		params = append(params, c.QueryParam("doorHeightRangeId"))
+		queryCondition.WriteString("door_height_id=")
+		queryCondition.WriteString(c.QueryParam("doorHeightRangeId"))
 	}
 
 	if c.QueryParam("doorWidthRangeId") != "" {
-		conditions = append(conditions, "door_width_id = ?")
-		params = append(params, c.QueryParam("doorWidthRangeId"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("door_width_id=")
+		queryCondition.WriteString(c.QueryParam("doorWidthRangeId"))
 	}
 
 	if c.QueryParam("rentRangeId") != "" {
-		conditions = append(conditions, "rent_id = ?")
-		params = append(params, c.QueryParam("rentRangeId"))
+		if queryCondition.Len() > 0 {
+			queryCondition.WriteString(" AND ")
+		}
+		queryCondition.WriteString("rent_id=")
+		queryCondition.WriteString(c.QueryParam("rentRangeId"))
 	}
 
 	if c.QueryParam("features") != "" {
 		for _, f := range strings.Split(c.QueryParam("features"), ",") {
-			conditions = append(conditions, "FIND_IN_SET(?, features_set)>0")
-			params = append(params, f)
+			if queryCondition.Len() > 0 {
+				queryCondition.WriteString(" AND ")
+			}
+			queryCondition.WriteString("FIND_IN_SET('")
+			queryCondition.WriteString(f)
+			queryCondition.WriteString("',features_set)>0")
 		}
 	}
 
-	if len(conditions) == 0 {
+	if queryCondition.Len() == 0 {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
@@ -862,19 +889,17 @@ func searchEstates(c echo.Context) error {
 
 	searchQuery := "SELECT id FROM estate WHERE "
 	countQuery := "SELECT COUNT(*) FROM estate WHERE "
-	searchCondition := strings.Join(conditions, " AND ")
-	limitOffset := " ORDER BY popularity DESC, id ASC LIMIT ? OFFSET ?"
+	limitOffset := fmt.Sprintf(" ORDER BY popularity DESC, id ASC LIMIT %d OFFSET %d", perPage, page*perPage)
 
 	var res EstateSearchResponse
-	err = estateDb.Get(&res.Count, countQuery+searchCondition, params...)
+	err = estateDb.Get(&res.Count, countQuery+queryCondition.String())
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	estateIDs := IDsPool.Get().([]int64)
 	defer putIDsPool(estateIDs)
-	params = append(params, perPage, page*perPage)
-	err = estateDb.Select(&estateIDs, searchQuery+searchCondition+limitOffset, params...)
+	err = estateDb.Select(&estateIDs, searchQuery+queryCondition.String()+limitOffset)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateSearchResponse{Count: 0, Estates: []Estate{}})
@@ -938,13 +963,12 @@ func searchRecommendedEstateWithChair(c echo.Context) error {
 	if h > d {
 		h, d = d, h
 	}
-	query := `SELECT id FROM estate WHERE (door_width >= ? AND door_height >= ?) OR (door_width >= ? AND door_height >= ?) ORDER BY popularity DESC, id ASC LIMIT ?`
-	err = estateDb.Select(&estateIDs, query, w, h, h, w, Limit)
+	query := fmt.Sprintf(`SELECT id FROM estate WHERE (door_width >= %d AND door_height >= %d) OR (door_width >= %d AND door_height >= %d) ORDER BY popularity DESC, id ASC LIMIT 20`, w, h, h, w)
+	err = estateDb.Select(&estateIDs, query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JSON(c, http.StatusOK, EstateListResponse{[]Estate{}})
 		}
-		c.Logger().Errorf("Database execution error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	estates := estatesPool.Get().([]Estate)
@@ -986,17 +1010,17 @@ func searchEstateNazotte(c echo.Context) error {
 	defer putIDsPool(estateIDs)
 	txt := builderPool.Get().(*strings.Builder)
 	defer putBuilderPool(txt)
-	txt.WriteString("POLYGON((")
+	txt.WriteString("'POLYGON((")
 	for idx, c := range coordinates.Coordinates {
 		if idx > 0 {
 			txt.WriteRune(',')
 		}
 		txt.WriteString(fmt.Sprintf("%f %f", c.Latitude, c.Longitude))
 	}
-	txt.WriteString("))")
+	txt.WriteString("))'")
 
-	query := `SELECT id FROM estate WHERE latitude <= ? AND latitude >= ? AND longitude <= ? AND longitude >= ? AND ST_Contains(ST_PolygonFromText(?), lat_log) ORDER BY popularity DESC, id ASC LIMIT ?`
-	err = estateDb.Select(&estateIDs, query, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, txt.String(), NazotteLimit)
+	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude <= %f AND latitude >= %f AND longitude <= %f AND longitude >= %f AND ST_Contains(ST_PolygonFromText(%s), lat_log) ORDER BY popularity DESC, id ASC LIMIT 50`, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, txt.String())
+	err = estateDb.Select(&estateIDs, query)
 	if err == sql.ErrNoRows {
 		return JSON(c, http.StatusOK, emptyEstateSearchResponse)
 	} else if err != nil {
