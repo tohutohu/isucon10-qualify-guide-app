@@ -559,7 +559,7 @@ func searchChairs(c echo.Context) error {
 		if queryCondition.Len() > 0 {
 			queryCondition.WriteString(" AND ")
 		}
-		queryCondition.WriteString("price_id=")
+		queryCondition.WriteString("p=")
 		queryCondition.WriteString(c.QueryParam("priceRangeId"))
 	}
 
@@ -567,7 +567,7 @@ func searchChairs(c echo.Context) error {
 		if queryCondition.Len() > 0 {
 			queryCondition.WriteString(" AND ")
 		}
-		queryCondition.WriteString("height_id=")
+		queryCondition.WriteString("h=")
 		queryCondition.WriteString(c.QueryParam("heightRangeId"))
 	}
 
@@ -575,7 +575,7 @@ func searchChairs(c echo.Context) error {
 		if queryCondition.Len() > 0 {
 			queryCondition.WriteString(" AND ")
 		}
-		queryCondition.WriteString("width_id=")
+		queryCondition.WriteString("w=")
 		queryCondition.WriteString(c.QueryParam("widthRangeId"))
 	}
 
@@ -583,7 +583,7 @@ func searchChairs(c echo.Context) error {
 		if queryCondition.Len() > 0 {
 			queryCondition.WriteString(" AND ")
 		}
-		queryCondition.WriteString("depth_id=")
+		queryCondition.WriteString("d=")
 		queryCondition.WriteString(c.QueryParam("depthRangeId"))
 	}
 
@@ -612,7 +612,7 @@ func searchChairs(c echo.Context) error {
 			}
 			queryCondition.WriteString("FIND_IN_SET('")
 			queryCondition.WriteString(f)
-			queryCondition.WriteString("',features_set)>0")
+			queryCondition.WriteString("',f)>0")
 		}
 	}
 
@@ -828,7 +828,7 @@ func searchEstates(c echo.Context) error {
 	queryCondition := builderPool.Get().(*strings.Builder)
 	defer putBuilderPool(queryCondition)
 	if c.QueryParam("doorHeightRangeId") != "" {
-		queryCondition.WriteString("door_height_id=")
+		queryCondition.WriteString("h=")
 		queryCondition.WriteString(c.QueryParam("doorHeightRangeId"))
 	}
 
@@ -836,7 +836,7 @@ func searchEstates(c echo.Context) error {
 		if queryCondition.Len() > 0 {
 			queryCondition.WriteString(" AND ")
 		}
-		queryCondition.WriteString("door_width_id=")
+		queryCondition.WriteString("w=")
 		queryCondition.WriteString(c.QueryParam("doorWidthRangeId"))
 	}
 
@@ -844,7 +844,7 @@ func searchEstates(c echo.Context) error {
 		if queryCondition.Len() > 0 {
 			queryCondition.WriteString(" AND ")
 		}
-		queryCondition.WriteString("rent_id=")
+		queryCondition.WriteString("r=")
 		queryCondition.WriteString(c.QueryParam("rentRangeId"))
 	}
 
@@ -855,7 +855,7 @@ func searchEstates(c echo.Context) error {
 			}
 			queryCondition.WriteString("FIND_IN_SET('")
 			queryCondition.WriteString(f)
-			queryCondition.WriteString("',features_set)>0")
+			queryCondition.WriteString("',f)>0")
 		}
 	}
 
@@ -1005,7 +1005,7 @@ func searchEstateNazotte(c echo.Context) error {
 	}
 	txt.WriteString("))'")
 
-	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude<=%f AND latitude>=%f AND longitude<=%f AND longitude>=%f AND ST_Contains(ST_PolygonFromText(%s),lat_log) ORDER BY popularity DESC, id ASC LIMIT 50`, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, txt.String())
+	query := fmt.Sprintf(`SELECT id FROM estate WHERE latitude<=%f AND latitude>=%f AND longitude<=%f AND longitude>=%f AND ST_Contains(ST_PolygonFromText(%s),l) ORDER BY popularity DESC, id ASC LIMIT 50`, b.BottomRightCorner.Latitude, b.TopLeftCorner.Latitude, b.BottomRightCorner.Longitude, b.TopLeftCorner.Latitude, txt.String())
 	err = estateDb.Select(&estateIDs, query)
 	if err == sql.ErrNoRows {
 		return c.JSON(http.StatusOK, emptyEstateSearchResponse)
