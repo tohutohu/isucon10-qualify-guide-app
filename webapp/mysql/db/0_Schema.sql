@@ -223,8 +223,8 @@ CREATE UNIQUE INDEX idx17 on isuumo.chair(price_id, width_id, depth_id, kind, co
 CREATE UNIQUE INDEX idx18 on isuumo.chair(height_id, width_id, depth_id, kind, color, stock, popularity desc, id);
 CREATE UNIQUE INDEX idx19 on isuumo.chair(height_id, kind, color, stock, popularity desc, id);
 CREATE UNIQUE INDEX idx20 on isuumo.chair(price_id, color, stock, popularity desc, id);
-CREATE UNIQUE INDEX idx21 on isuumo.chair(width_id, depth_id, kind, color, stock, popularity desc, id);
-CREATE UNIQUE INDEX idx22 on isuumo.chair(price_id, height_id, depth_id, stock, popularity desc, id);
+# CREATE UNIQUE INDEX idx21 on isuumo.chair(width_id, depth_id, kind, color, stock, popularity desc, id);
+# CREATE UNIQUE INDEX idx22 on isuumo.chair(price_id, height_id, depth_id, stock, popularity desc, id);
 # CREATE UNIQUE INDEX idx23 on isuumo.chair(price_id, height_id, stock, popularity desc, id);
 # CREATE UNIQUE INDEX idx24 on isuumo.chair(price_id, height_id, width_id, stock, popularity desc, id);
 # CREATE UNIQUE INDEX idx25 on isuumo.chair(height_id, width_id, color, stock, popularity desc, id);

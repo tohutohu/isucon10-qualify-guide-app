@@ -251,19 +251,35 @@ func init() {
 	}
 	json.Unmarshal(jsonText, &estateSearchCondition)
 
+	getEstateCacheMux = sync.RWMutex{}
+	recommendCacheMux = sync.RWMutex{}
+	getEstateCache = make(map[int]Estate)
 	reset()
+}
+
+func reset() {
+	resetChair()
+	resetGetEstateCache()
 }
 
 var recommendCache map[int]EstateListResponse
 var recommendCacheMux sync.RWMutex
 
-func reset() {
-	resetChair()
-}
-
 func resetChair() {
 	recommendCache = make(map[int]EstateListResponse)
-	recommendCacheMux = sync.RWMutex{}
+}
+
+var getEstateCache map[int]Estate
+var getEstateCacheMux sync.RWMutex
+
+func resetGetEstateCache() {
+	next := make(map[int]Estate)
+	for key, val := range getEstateCache {
+		if key <= 30000 {
+			next[key] = val
+		}
+	}
+	getEstateCache = next
 }
 
 func JSON(c echo.Context, code int, i interface{}) error {
@@ -631,6 +647,12 @@ func getEstateDetail(c echo.Context) error {
 		c.Echo().Logger.Infof("Request parameter \"id\" parse error : %v", err)
 		return c.NoContent(http.StatusBadRequest)
 	}
+	getEstateCacheMux.RLock()
+	if val, ok := getEstateCache[id]; ok {
+		getEstateCacheMux.RUnlock()
+		return JSON(c, http.StatusOK, val)
+	}
+	getEstateCacheMux.RUnlock()
 
 	var estate Estate
 	err = estateDb.Get(&estate, "SELECT id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity FROM estate WHERE id = ?", id)
@@ -643,6 +665,9 @@ func getEstateDetail(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	getEstateCacheMux.Lock()
+	defer getEstateCacheMux.Unlock()
+	getEstateCache[id] = estate
 	return JSON(c, http.StatusOK, estate)
 }
 
