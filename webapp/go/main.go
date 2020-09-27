@@ -504,6 +504,7 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	resetChair()
+	lowPricedChairs.Delete("cache")
 	return c.NoContent(http.StatusCreated)
 }
 
@@ -726,7 +727,6 @@ func postEstate(c echo.Context) error {
 		c.Logger().Errorf("failed to insert estate: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	lowPricedChairs.Delete("cache")
 	return c.NoContent(http.StatusCreated)
 }
 
